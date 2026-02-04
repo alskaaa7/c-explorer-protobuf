@@ -22,11 +22,10 @@
   - Обнаружение функций с их параметрами
   - Анализ include директив
   - Предпросмотр содержимого файла
-- **Современный интерфейс**: Vue 3 + Element Plus
+- **Интерфейс**: Vue 3 + Element Plus
 - **Полная поддержка C/C++**: `.c`, `.cpp`, `.h`, `.hpp`, `.cc`, `.cxx`, `.hxx`
 
 ## Структура проекта
-
 
 ## Требования
 
@@ -46,27 +45,27 @@
 ## Структура проекта
 
 ### backend:
-main.py # FastAPI приложение
-schema.proto # Protobuf схема
-schema_pb2.py # Сгенерированный Python код
-uploads/ # Загруженные файлы
+- main.py # FastAPI приложение
+- schema.proto # Protobuf схема
+- schema_pb2.py # Сгенерированный Python код
+- uploads/ # Загруженные файлы
 
 ### frontend:
-public/
-proto/
-schema.proto # Protobuf схема для фронтенда
-src/
-main.js # Точка входа Vue
-App.vue # Главный компонент
-components/ # Vue компоненты
-utils/ # Утилиты
-router/ # Маршрутизация
+- public/
+- proto/
+- schema.proto # Protobuf схема для фронтенда
+#### src/
+- main.js # Точка входа Vue
+- App.vue # Главный компонент
+##### components/ # Vue компоненты
+- utils/ # Утилиты
+- router/ # Маршрутизация
 
 ### Остальное:
-package.json # Зависимости фронтенда
-vite.config.js # Конфигурация Vite
-index.html # HTML шаблон
-README.md
+- package.json # Зависимости фронтенда
+- vite.config.js # Конфигурация Vite
+- index.html # HTML шаблон
+- README.md
 
 ## Установка
 
@@ -109,9 +108,9 @@ python main.py
 ```
 
 
-Сервер запустится на http://localhost:8000
-API документация: http://localhost:8000/docs
-Альтернативная документация: http://localhost:8000/redoc
+- Сервер запустится на http://localhost:8000 
+- API документация: http://localhost:8000/docs
+- Альтернативная документация: http://localhost:8000/redoc
 
 
 ## Запуск фронтенда
