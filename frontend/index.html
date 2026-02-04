@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C/C++ File Analyzer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; border-radius: 10px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; margin-bottom: 20px; }
+        .upload-area { border: 2px dashed #007bff; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; margin: 20px 0; }
+        .upload-area:hover { background: #f0f7ff; }
+        input[type="file"] { display: none; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .file-list { margin-top: 20px; }
+        .file-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+        .stat-box { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #007bff; }
+        .stat-label { font-size: 12px; color: #666; }
+        pre { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 8px; overflow-x: auto; max-height: 300px; overflow-y: auto; }
+        .warning { background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 C/C++ File Analyzer with Protobuf</h1>
+        
+        <div class="card">
+            <h2>Загрузить файл</h2>
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <p>📤 Перетащите файл или кликните для выбора</p>
+                <p><small>Поддерживаются: .c, .cpp, .h, .hpp</small></p>
+                <input type="file" id="fileInput" onchange="handleFileSelect(event)">
+            </div>
+            
+            <div id="uploadStatus"></div>
+            
+            <div style="text-align: center;">
+                <button onclick="uploadFile()" id="uploadBtn">Загрузить</button>
+                <label>
+                    <input type="checkbox" id="useProtobuf" checked> Использовать Protobuf
+                </label>
+            </div>
+        </div>
+        
+        <div class="card" id="analysisResult" style="display: none;">
+            <h2>Результат анализа</h2>
+            <div id="resultContent"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Загруженные файлы</h2>
+            <div class="file-list" id="fileList"></div>
+        </div>
+        
+        <div class="card">
+            <h3>Информация о сервере</h3>
+            <div id="serverInfo">Загрузка...</div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        
+        function handleFileSelect(event) {
+            selectedFile = event.target.files[0];
+            document.getElementById('uploadStatus').innerHTML = `
+                <div class="success">
+                    Выбран файл: <strong>${selectedFile.name}</strong><br>
+                    Размер: ${formatSize(selectedFile.size)}
+                </div>
+            `;
+        }
+        
+        async function uploadFile() {
+            if (!selectedFile) {
+                alert('Выберите файл!');
+                return;
+            }
+            
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.textContent = 'Загрузка...';
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('uploadStatus').innerHTML = `
+                        <div class="success">
+                            Файл загружен! ID: ${data.file_id}
+                        </div>
+                    `;
+                    analyzeFile(data.file_id);
+                    loadFiles();
+                } else {
+                    document.getElementById('uploadStatus').innerHTML = `
+                        <div class="error">
+                            Ошибка: ${data.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('uploadStatus').innerHTML = `
+                    <div class="error">
+                        Ошибка сети: ${error.message}
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Загрузить';
+            }
+        }
+        
+        async function analyzeFile(fileId) {
+            const useProtobuf = document.getElementById('useProtobuf').checked;
+            const format = useProtobuf ? 'protobuf' : 'json';
+            
+            try {
+                const response = await fetch(`/api/analyze/${fileId}?format=${format}`);
+                
+                let data;
+                if (useProtobuf && response.headers.get('content-type') === 'application/octet-stream') {
+                    const buffer = await response.arrayBuffer();
+                    data = {
+                        protobuf_used: true,
+                        binary_size: buffer.byteLength,
+                        message: "Получены бинарные данные Protobuf"
+                    };
+                    const jsonResponse = await fetch(`/api/analyze/${fileId}?format=json`);
+                    data = await jsonResponse.json();
+                } else {
+                    data = await response.json();
+                }
+                
+                if (data.success) {
+                    showAnalysisResult(data);
+                } else {
+                    document.getElementById('resultContent').innerHTML = `
+                        <div class="error">Ошибка анализа: ${data.error}</div>
+                    `;
+                }
+                
+                document.getElementById('analysisResult').style.display = 'block';
+            } catch (error) {
+                document.getElementById('resultContent').innerHTML = `
+                    <div class="error">Ошибка: ${error.message}</div>
+                `;
+            }
+        }
+        
+        function showAnalysisResult(data) {
+            let html = '';
+            
+            if (data.protobuf_used === false) {
+                html += `<div class="warning">⚠️ Protobuf не доступен. Используется простой анализ.</div>`;
+            }
+            
+            html += `
+                <h3>${data.file_name}</h3>
+                <p>Размер: ${formatSize(data.file_size)} | ${data.is_c_file ? 'C/C++ файл' : 'Текстовый файл'}</p>
+            `;
+            
+            if (data.warning) {
+                html += `<div class="warning">${data.warning}</div>`;
+            }
+            
+            if (data.is_c_file) {
+                html += `
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-value">${data.total_lines || 0}</div>
+                            <div class="stat-label">Всего строк</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${data.code_lines || 0}</div>
+                            <div class="stat-label">Строк кода</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${data.comment_lines || 0}</div>
+                            <div class="stat-label">Комментарии</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${data.empty_lines || 0}</div>
+                            <div class="stat-label">Пустые строки</div>
+                        </div>
+                    </div>
+                `;
+                
+                if (data.functions && data.functions.length > 0) {
+                    html += `<h4>Найдено функций: ${data.functions.length}</h4>`;
+                    html += `<ul>`;
+                    data.functions.forEach(func => {
+                        html += `<li><code>${func}</code></li>`;
+                    });
+                    html += `</ul>`;
+                }
+                
+                if (data.includes && data.includes.length > 0) {
+                    html += `<h4>Include директивы:</h4>`;
+                    html += `<ul>`;
+                    data.includes.forEach(inc => {
+                        html += `<li><code>${inc}</code></li>`;
+                    });
+                    html += `</ul>`;
+                }
+            }
+            
+            if (data.content_preview) {
+                html += `<h4>Предпросмотр:</h4>`;
+                html += `<pre><code>${data.content_preview}</code></pre>`;
+            }
+            
+            document.getElementById('resultContent').innerHTML = html;
+        }
+        
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const data = await response.json();
+                
+                if (data.success) {
+                    let html = '';
+                    data.files.forEach(file => {
+                        html += `
+                            <div class="file-item">
+                                <div>
+                                    <strong>${file.name}</strong><br>
+                                    <small>${formatSize(file.size)} | ${file.is_c ? 'C/C++' : 'Другой'}</small>
+                                </div>
+                                <div>
+                                    <button onclick="analyzeFile('${file.id}')">Анализ</button>
+                                    <button onclick="deleteFile('${file.id}')">Удалить</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    document.getElementById('fileList').innerHTML = html || '<p>Нет загруженных файлов</p>';
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки файлов:', error);
+            }
+        }
+        
+        async function deleteFile(fileId) {
+            if (!confirm('Удалить этот файл?')) return;
+            
+            try {
+                const response = await fetch(`/api/files/${fileId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    loadFiles();
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            } catch (error) {
+                alert('Ошибка сети: ' + error.message);
+            }
+        }
+        
+        async function loadServerInfo() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                document.getElementById('serverInfo').innerHTML = `
+                    <p>Статус: <strong>${data.status}</strong></p>
+                    <p>Protobuf: <strong>${data.protobuf ? 'Доступен' : 'Не доступен'}</strong></p>
+                    <p>Папка uploads: <strong>${data.uploads_dir ? 'Существует' : 'Не найдена'}</strong></p>
+                `;
+            } catch (error) {
+                document.getElementById('serverInfo').innerHTML = `
+                    <div class="error">Не удалось подключиться к серверу</div>
+                `;
+            }
+        }
+        
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        loadFiles();
+        loadServerInfo();
+        
+        const uploadArea = document.querySelector('.upload-area');
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.background = '#f0f7ff';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.background = '';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.background = '';
+            
+            if (e.dataTransfer.files.length) {
+                selectedFile = e.dataTransfer.files[0];
+                document.getElementById('uploadStatus').innerHTML = `
+                    <div class="success">
+                        Выбран файл: <strong>${selectedFile.name}</strong><br>
+                        Размер: ${formatSize(selectedFile.size)}
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
