@@ -54,10 +54,10 @@
 - public/
 - proto/
 - schema.proto # Protobuf схема для фронтенда
-#### src/
+#### src:
 - main.js # Точка входа Vue
 - App.vue # Главный компонент
-##### components/ # Vue компоненты
+##### components: # Vue компоненты
 - utils/ # Утилиты
 - router/ # Маршрутизация
 
