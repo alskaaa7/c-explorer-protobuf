@@ -120,5 +120,5 @@ cd frontend
 npm run dev
 ```
 
-Фронтенд запустится на http://localhost:5173
+- Фронтенд запустится на http://localhost:5173
 
